@@ -311,9 +311,14 @@ const resultGrid = document.getElementById('resultGrid');
 let availableImages = [];
 let allImageNames = [];
 
+const REQUEST_TIMEOUT_MS = 90000;
+const MAX_RETRIES = 3;
+
 // Initialize the application
 async function init() {
     try {
+        // Warm up backend early to reduce first-interaction failures.
+        checkHealth();
         await loadAvailableImages();
         await loadImageNames();
         renderImageGallery();
@@ -444,8 +449,10 @@ async function segmentImage(imageName, city = null) {
         }
 
         // Use Azure Functions-only inference path.
-        const groundTruthResponse = await fetch(
-            `${API_BASE_URL}/colorized-masks?image_name=${encodeURIComponent(cleanImageName)}`
+        const groundTruthResponse = await fetchWithRetry(
+            `${API_BASE_URL}/colorized-masks?image_name=${encodeURIComponent(cleanImageName)}`,
+            {},
+            MAX_RETRIES
         );
 
         if (!groundTruthResponse.ok) {
@@ -459,10 +466,40 @@ async function segmentImage(imageName, city = null) {
 
     } catch (error) {
         console.error('Error during colorized mask generation:', error);
-        showError(`Colorized mask generation failed: ${error.message}`);
+        const msg = String(error.message || error);
+        if (msg.includes('HTTP 503') || msg.includes('timed out')) {
+            showError('Backend is warming up. Please wait a few seconds and try again.');
+        } else {
+            showError(`Colorized mask generation failed: ${error.message}`);
+        }
     } finally {
         showLoading(false);
     }
+}
+
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.status === 503 && attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+                continue;
+            }
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            lastError = error;
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+                continue;
+            }
+        }
+    }
+    throw lastError || new Error('Request failed after retries');
 }
 
 // Create placeholder image using Canvas
