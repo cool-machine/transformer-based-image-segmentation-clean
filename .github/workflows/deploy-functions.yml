@@ -2,7 +2,7 @@ name: Deploy Azure Functions API
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths: [ 'backend/**' ]
   workflow_dispatch:
 

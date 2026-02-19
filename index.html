@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Segmentation System</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔍%3C/text%3E%3C/svg%3E"">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔍%3C/text%3E%3C/svg%3E">
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -245,7 +245,7 @@
     <div class="container">
         <div class="header">
             <h1>🔍 Image Segmentation System</h1>
-            <div class="subtitle">AI-Powered Segmentation System - v4.0 (SegFormer + Container API + Beautiful Masks)</div>
+            <div class="subtitle">AI-Powered Segmentation System - v4.0 (SegFormer + Beautiful Masks)</div>
         </div>
         
         <div class="content">
@@ -443,11 +443,10 @@ async function segmentImage(imageName, city = null) {
             cleanImageName = imageName.replace('.png', '').replace('.jpg', '');
         }
 
-        // Call both endpoints in parallel
-        const [groundTruthResponse, aiPredictionResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/colorized-masks?image_name=${encodeURIComponent(cleanImageName)}`),
-            fetch(`${API_BASE_URL}/predict-with-container?image_name=${encodeURIComponent(cleanImageName)}`)
-        ]);
+        // Use Azure Functions-only inference path.
+        const groundTruthResponse = await fetch(
+            `${API_BASE_URL}/colorized-masks?image_name=${encodeURIComponent(cleanImageName)}`
+        );
 
         if (!groundTruthResponse.ok) {
             const errorData = await groundTruthResponse.json().catch(() => ({ error: 'Unknown error occurred' }));
@@ -456,26 +455,7 @@ async function segmentImage(imageName, city = null) {
 
         const groundTruthResult = await groundTruthResponse.json();
         
-        // Handle AI prediction (might timeout or fail)
-        let aiPredictionResult = null;
-        if (aiPredictionResponse.ok) {
-            try {
-                aiPredictionResult = await aiPredictionResponse.json();
-                console.log('✅ AI prediction successful:', aiPredictionResult);
-            } catch (error) {
-                console.log('⚠️ AI prediction failed to parse:', error);
-            }
-        } else {
-            console.log('⚠️ AI prediction API call failed:', aiPredictionResponse.status);
-        }
-
-        // Combine results
-        const combinedResult = {
-            ...groundTruthResult,
-            ai_prediction: aiPredictionResult
-        };
-        
-        displayColorizedResults(combinedResult);
+        displayColorizedResults(groundTruthResult);
 
     } catch (error) {
         console.error('Error during colorized mask generation:', error);
@@ -536,27 +516,19 @@ function displayColorizedResults(result) {
         });
     }
 
-    // AI Model Prediction from Container API
-    if (result.ai_prediction?.status === 'success' && result.ai_prediction?.prediction_visualization) {
-        resultItems.push({
-            title: '🤖 AI Model Prediction',
-            imageUrl: result.ai_prediction.prediction_visualization,
-            info: `Fine-tuned SegFormer model prediction (${result.ai_prediction.model_info?.classes_found?.length || 0} classes detected)`
-        });
-    } else if (result.visualizations?.predicted) {
-        // Fallback to old prediction format
+    // AI Model Prediction from Azure Functions inference
+    if (result.visualizations?.predicted) {
         resultItems.push({
             title: '🤖 AI Model Prediction',
             imageUrl: result.visualizations.predicted,
             info: `Fine-tuned SegFormer model prediction with beautiful colors`
         });
     } else {
-        // Show placeholder when prediction is not available
-        const errorMsg = result.ai_prediction?.message || 'Model is loading or not available yet';
+        // Backend now fails fast on missing inference; this indicates an unexpected response.
         resultItems.push({
             title: '🤖 AI Model Prediction',
             imageUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjVmNWY1Ii8+PHRleHQgeD0iNTAlIiB5PSI0NSUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFJIE1vZGVsPC90ZXh0Pjx0ZXh0IHg9IjUwJSIgeT0iNTUlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5Mb2FkaW5nLi4uPC90ZXh0Pjwvc3ZnPg==',
-            info: errorMsg
+            info: 'Prediction data missing in API response.'
         });
     }
 

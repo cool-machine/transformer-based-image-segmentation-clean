@@ -3,7 +3,6 @@
   "Values": {
     "AzureWebJobsStorage": "",
     "FUNCTIONS_WORKER_RUNTIME": "python",
-    "AZURE_STORAGE_CONNECTION_STRING": "",
-    "CONTAINER_ENDPOINT": ""
+    "IMAGES_STORAGE_CONNECTION_STRING": ""
   }
 }

@@ -25,9 +25,11 @@ try:
     import tensorflow as tf
     from transformers import TFSegformerForSemanticSegmentation, SegformerConfig
     HAS_MODEL_SUPPORT = True
+    MODEL_IMPORT_ERROR = None
     logging.info("✅ Model libraries loaded successfully")
 except ImportError as e:
     HAS_MODEL_SUPPORT = False
+    MODEL_IMPORT_ERROR = str(e)
     logging.warning(f"⚠️ Model libraries not available: {e}")
 
 app = func.FunctionApp()
@@ -473,231 +475,6 @@ def images(req: func.HttpRequest) -> func.HttpResponse:
             }
         )
 
-@app.function_name(name="masks")
-@app.route(route="masks", auth_level=func.AuthLevel.ANONYMOUS)
-def masks(req: func.HttpRequest) -> func.HttpResponse:
-    """List available masks from storage."""
-    
-    logging.info('Masks endpoint hit.')
-    
-    try:
-        storage_connection_string = os.getenv('IMAGES_STORAGE_CONNECTION_STRING')
-        
-        if not storage_connection_string:
-            return func.HttpResponse(
-                json.dumps({"error": "Storage connection string not configured"}),
-                mimetype="application/json",
-                status_code=500
-            )
-        
-        # Connect to Azure Storage
-        blob_service_client = BlobServiceClient.from_connection_string(storage_connection_string)
-        container_client = blob_service_client.get_container_client("images1")
-        
-        # List blobs in masks folder
-        mask_blobs = []
-        for blob in container_client.list_blobs(name_starts_with="masks/"):
-            if blob.name.lower().endswith(('.png', '.jpg', '.jpeg')):
-                mask_blobs.append({
-                    "name": blob.name,
-                    "size": blob.size,
-                    "last_modified": blob.last_modified.isoformat() if blob.last_modified else None
-                })
-        
-        result = {
-            "masks": mask_blobs[:10],  # Limit to first 10 for testing
-            "total_count": len(mask_blobs),
-            "container": "images1",
-            "path": "masks/"
-        }
-        
-        return func.HttpResponse(
-            json.dumps(result, indent=2),
-            mimetype="application/json",
-            status_code=200,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
-        
-    except Exception as e:
-        logging.error(f"Masks endpoint error: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            mimetype="application/json",
-            status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
-
-@app.function_name(name="check_model_container")
-@app.route(route="check-model-container", auth_level=func.AuthLevel.ANONYMOUS)
-def check_model_container(req: func.HttpRequest) -> func.HttpResponse:
-    """Debug endpoint to check what's in the model container"""
-    try:
-        storage_connection_string = os.getenv('IMAGES_STORAGE_CONNECTION_STRING')
-        
-        if not storage_connection_string:
-            return func.HttpResponse(
-                json.dumps({"error": "Storage connection string not configured"}),
-                mimetype="application/json",
-                status_code=500
-            )
-        
-        blob_service_client = BlobServiceClient.from_connection_string(storage_connection_string)
-        
-        # Check if model container exists
-        try:
-            model_container_client = blob_service_client.get_container_client("models")
-            blob_list = list(model_container_client.list_blobs())
-            
-            model_files = []
-            for blob in blob_list:
-                model_files.append({
-                    "name": blob.name,
-                    "size": blob.size,
-                    "last_modified": blob.last_modified.isoformat() if blob.last_modified else None
-                })
-            
-            result = {
-                "status": "success",
-                "model_container_exists": True,
-                "files_found": len(model_files),
-                "model_files": model_files,
-                "has_model_support": HAS_MODEL_SUPPORT,
-                "model_loaded": _model_loaded
-            }
-            
-        except Exception as container_error:
-            result = {
-                "status": "error",
-                "model_container_exists": False,
-                "error": str(container_error),
-                "has_model_support": HAS_MODEL_SUPPORT,
-                "model_loaded": _model_loaded
-            }
-        
-        return func.HttpResponse(
-            json.dumps(result, indent=2),
-            mimetype="application/json",
-            status_code=200
-        )
-        
-    except Exception as e:
-        return func.HttpResponse(
-            json.dumps({"error": f"Unexpected error: {str(e)}"}),
-            mimetype="application/json",
-            status_code=500
-        )
-
-@app.function_name(name="test_matplotlib")
-@app.route(route="test-matplotlib", auth_level=func.AuthLevel.ANONYMOUS)
-def test_matplotlib(req: func.HttpRequest) -> func.HttpResponse:
-    """Test matplotlib functionality."""
-    
-    logging.info('Test matplotlib endpoint hit.')
-    
-    try:
-        # Create a simple test plot
-        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-        
-        # Create test data
-        x = np.linspace(0, 10, 100)
-        y = np.sin(x)
-        
-        ax.plot(x, y, label='sin(x)')
-        ax.set_title('Matplotlib Test - Colorized Mask Generation Ready')
-        ax.set_xlabel('x')
-        ax.set_ylabel('sin(x)')
-        ax.legend()
-        ax.grid(True)
-        
-        # Convert to PIL Image
-        buffer = BytesIO()
-        fig.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
-        buffer.seek(0)
-        plt.close(fig)
-        
-        # Convert to base64
-        img_base64 = base64.b64encode(buffer.getvalue()).decode()
-        
-        result = {
-            "status": "success",
-            "message": "Matplotlib is working correctly",
-            "matplotlib_version": matplotlib.__version__,
-            "test_plot": f"data:image/png;base64,{img_base64}"
-        }
-        
-        return func.HttpResponse(
-            json.dumps(result),
-            mimetype="application/json",
-            status_code=200,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
-        
-    except Exception as e:
-        logging.error(f"Matplotlib test error: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({"error": f"Matplotlib test failed: {str(e)}"}),
-            mimetype="application/json",
-            status_code=500
-        )
-
-def plot_beautiful_mask_overlay(image, mask, title='Beautiful Segmentation Overlay', alpha=0.6):
-    """
-    Your original matplotlib overlay function - the exact approach you wanted!
-    """
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-    
-    # Display the original image
-    ax.imshow(image)
-    
-    # Create beautiful colorized mask and overlay it
-    colorized_mask = colorize_mask_beautiful(mask)
-    ax.imshow(colorized_mask, alpha=alpha)
-    
-    ax.set_title(title)
-    ax.axis('off')
-    
-    return fig
-
-def create_three_panel_comparison(image, mask, title_prefix=''):
-    """
-    Create three-panel layout: Original | Mask | Overlay
-    """
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    
-    # Original image
-    axes[0].imshow(image)
-    axes[0].set_title(f'{title_prefix}Original Image')
-    axes[0].axis('off')
-    
-    # Colorized mask only
-    im1 = axes[1].imshow(mask, cmap='jet', vmin=0, vmax=7)
-    axes[1].set_title(f'{title_prefix}Colorized Mask')
-    axes[1].axis('off')
-    
-    # Overlay
-    axes[2].imshow(image)
-    axes[2].imshow(mask, cmap='jet', alpha=0.6, vmin=0, vmax=7)
-    axes[2].set_title(f'{title_prefix}Overlay')
-    axes[2].axis('off')
-    
-    # Add colorbar
-    plt.colorbar(im1, ax=axes[1], shrink=0.8)
-    
-    plt.tight_layout()
-    return fig
-
 def convert_to_base64(fig):
     """Convert matplotlib figure to base64 string."""
     buffer = BytesIO()
@@ -726,6 +503,18 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
         if not storage_connection_string:
             return func.HttpResponse(
                 json.dumps({"error": "Storage connection string not configured"}),
+                mimetype="application/json",
+                status_code=500
+            )
+
+        # Fail fast: inference dependencies are required.
+        if not HAS_MODEL_SUPPORT:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Model inference dependencies are not available",
+                    "details": MODEL_IMPORT_ERROR,
+                    "required": ["tensorflow", "transformers"]
+                }),
                 mimetype="application/json",
                 status_code=500
             )
@@ -784,48 +573,43 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
         ax.axis('off')
         ground_truth_base64 = convert_to_base64(mask_fig)
         
-        # 3. Predicted Mask - Use trained SegFormer model
+        # 3. Predicted Mask - mandatory inference path (no fallback)
         predicted_base64 = None
-        
-        # Try to load model if not already loaded
-        if HAS_MODEL_SUPPORT and not _model_loaded:
-            try:
-                logging.info("🔄 Attempting to load trained SegFormer model...")
-                model_dir, _ = download_model_from_azure(storage_connection_string, "models")
-                if model_dir:
-                    load_trained_segformer_model(model_dir)
-            except Exception as e:
-                logging.warning(f"⚠️ Could not load model: {e}")
-        
-        # Generate prediction if model is loaded
-        if _model_loaded:
-            try:
-                logging.info("🔮 Generating AI prediction...")
-                predicted_mask = predict_with_segformer(image_array)
-                
-                if predicted_mask is not None:
-                    # Create prediction visualization
-                    pred_fig, pred_ax = plt.subplots(1, 1, figsize=(12, 8))
-                    
-                    # Show original image as background
-                    pred_ax.imshow(image_array)
-                    # Overlay predicted mask with beautiful colors
-                    predicted_colorized = colorize_mask_beautiful(predicted_mask)
-                    pred_ax.imshow(predicted_colorized, alpha=0.8)
-                    
-                    pred_ax.set_title('AI Model Prediction (Fine-tuned SegFormer)')
-                    pred_ax.axis('off')
-                    
-                    predicted_base64 = convert_to_base64(pred_fig)
-                    logging.info("✅ AI prediction visualization created!")
-                else:
-                    logging.warning("⚠️ Prediction returned None")
-            except Exception as e:
-                logging.error(f"❌ Prediction failed: {e}")
-                import traceback
-                logging.error(traceback.format_exc())
-        else:
-            logging.info("ℹ️ Model not loaded, skipping prediction")
+
+        if not _model_loaded:
+            logging.info("🔄 Attempting to load trained SegFormer model...")
+            model_dir, _ = download_model_from_azure(storage_connection_string, "models")
+            if not model_dir or not load_trained_segformer_model(model_dir):
+                return func.HttpResponse(
+                    json.dumps({
+                        "error": "Model loading failed",
+                        "details": "SegFormer could not be loaded from Azure model storage"
+                    }),
+                    mimetype="application/json",
+                    status_code=500
+                )
+
+        logging.info("🔮 Generating AI prediction...")
+        predicted_mask = predict_with_segformer(image_array)
+        if predicted_mask is None:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Prediction failed",
+                    "details": "SegFormer inference returned no mask"
+                }),
+                mimetype="application/json",
+                status_code=500
+            )
+
+        # Create prediction visualization
+        pred_fig, pred_ax = plt.subplots(1, 1, figsize=(12, 8))
+        pred_ax.imshow(image_array)
+        predicted_colorized = colorize_mask_beautiful(predicted_mask)
+        pred_ax.imshow(predicted_colorized, alpha=0.8)
+        pred_ax.set_title('AI Model Prediction (Fine-tuned SegFormer)')
+        pred_ax.axis('off')
+        predicted_base64 = convert_to_base64(pred_fig)
+        logging.info("✅ AI prediction visualization created!")
         
         result = {
             "status": "success",
@@ -958,167 +742,6 @@ def image_thumbnail(req: func.HttpRequest) -> func.HttpResponse:
         
     except Exception as e:
         logging.error(f"Image thumbnail error: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({"error": str(e)}),
-            mimetype="application/json",
-            status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
-
-@app.function_name(name="predict_with_container")
-@app.route(route="predict-with-container", auth_level=func.AuthLevel.ANONYMOUS)
-def predict_with_container(req: func.HttpRequest) -> func.HttpResponse:
-    """Use the containerized model API for predictions."""
-    
-    logging.info('Container prediction endpoint hit.')
-    
-    try:
-        # Get parameters
-        image_name = req.params.get('image_name')
-        if not image_name:
-            image_name = "lindau_000000_000019_leftImg8bit"  # Default test image
-        
-        storage_connection_string = os.getenv('IMAGES_STORAGE_CONNECTION_STRING')
-        
-        if not storage_connection_string:
-            return func.HttpResponse(
-                json.dumps({"error": "Storage connection string not configured"}),
-                mimetype="application/json",
-                status_code=500,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type"
-                }
-            )
-        
-        # Connect to Azure Storage and get image
-        blob_service_client = BlobServiceClient.from_connection_string(storage_connection_string)
-        container_client = blob_service_client.get_container_client("images1")
-        
-        # Load image
-        if not image_name.endswith("_leftImg8bit"):
-            image_blob_name = f"images/{image_name}_leftImg8bit.png"
-        else:
-            image_blob_name = f"images/{image_name}.png"
-            
-        try:
-            # Download image
-            image_blob = container_client.get_blob_client(image_blob_name)
-            image_data = image_blob.download_blob().readall()
-            image = Image.open(BytesIO(image_data))
-            image_array = np.array(image)
-            
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps({"error": f"Could not load image: {str(e)}"}),
-                mimetype="application/json",
-                status_code=404,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type"
-                }
-            )
-        
-        # Convert image to base64 for API call
-        buffer = BytesIO()
-        image.save(buffer, format='PNG')
-        buffer.seek(0)
-        image_b64 = base64.b64encode(buffer.getvalue()).decode()
-        
-        # Call the container API
-        import requests
-        container_url = "https://segformer-model-api.victoriousforest-a1dd6cc5.centralus.azurecontainerapps.io"
-        
-        try:
-            logging.info(f"🚀 Calling container API at {container_url}/predict")
-            
-            response = requests.post(
-                f"{container_url}/predict",
-                json={"image": image_b64},
-                timeout=120,  # 2 minutes timeout
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                container_result = response.json()
-                
-                # Generate visualization with the prediction
-                if 'prediction' in container_result:
-                    # Decode the prediction mask
-                    prediction_b64 = container_result['prediction'].split(',')[1]
-                    pred_data = base64.b64decode(prediction_b64)
-                    pred_image = Image.open(BytesIO(pred_data))
-                    pred_mask = np.array(pred_image)
-                    
-                    # Create visualization - AI predictions are already in 8-class format, no conversion needed
-                    pred_fig, pred_ax = plt.subplots(1, 1, figsize=(12, 8))
-                    pred_ax.imshow(image_array)
-                    # Apply colors directly to AI prediction (already 8-class format)
-                    pred_colorized = np.zeros((*pred_mask.shape, 3), dtype=np.uint8)
-                    for class_idx, color in BEAUTIFUL_COLOR_MAP.items():
-                        if class_idx < 8:
-                            pred_colorized[pred_mask == class_idx] = color
-                    pred_ax.imshow(pred_colorized, alpha=0.8)
-                    pred_ax.set_title('AI Model Prediction (Container API)')
-                    pred_ax.axis('off')
-                    
-                    predicted_base64 = convert_to_base64(pred_fig)
-                    
-                    result = {
-                        "status": "success",
-                        "message": "Container API prediction successful!",
-                        "image_name": image_name,
-                        "container_api_url": container_url,
-                        "model_info": {
-                            "prediction_shape": container_result.get("shape"),
-                            "classes_found": container_result.get("classes")
-                        },
-                        "prediction_visualization": predicted_base64
-                    }
-                else:
-                    result = {
-                        "status": "error",
-                        "message": "Container API didn't return prediction",
-                        "container_response": container_result
-                    }
-                
-            else:
-                result = {
-                    "status": "error",
-                    "message": f"Container API returned status {response.status_code}",
-                    "response_text": response.text
-                }
-                
-        except requests.exceptions.Timeout:
-            result = {
-                "status": "error",
-                "message": "Container API request timed out (model may still be loading)"
-            }
-        except Exception as api_error:
-            result = {
-                "status": "error", 
-                "message": f"Container API call failed: {str(api_error)}"
-            }
-        
-        return func.HttpResponse(
-            json.dumps(result),
-            mimetype="application/json",
-            status_code=200,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
-        
-    except Exception as e:
-        logging.error(f"Container prediction error: {str(e)}")
         return func.HttpResponse(
             json.dumps({"error": str(e)}),
             mimetype="application/json",

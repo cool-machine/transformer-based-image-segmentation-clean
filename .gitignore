@@ -182,13 +182,13 @@ Thumbs.db
 *windsurf*
 *aider*
 # Session Documentation (keep local only - prevent coding agent propagation)
-CLAUDE.md
-SESSION_*.md
-*_SESSION.md
-DEVELOPMENT_*.md
+# CLAUDE.md
+# SESSION_*.md
+# *_SESSION.md
+# DEVELOPMENT_*.md
 
-.claude*
-.anthropic*
+# .claude*
+# .anthropic*
 
 # Azure Functions
 local.settings.json
