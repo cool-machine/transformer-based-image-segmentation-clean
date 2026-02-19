@@ -5,3 +5,4 @@ numpy==1.26.4
 matplotlib==3.9.2
 tensorflow>=2.17.0
 transformers>=4.35.0
+protobuf>=5.28.0

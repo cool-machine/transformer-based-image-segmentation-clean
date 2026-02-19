@@ -427,7 +427,12 @@ def images(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse(
                 json.dumps({"error": "Storage connection string not configured"}),
                 mimetype="application/json",
-                status_code=500
+                status_code=500,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
             )
         
         # Connect to Azure Storage
@@ -516,7 +521,12 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
                     "required": ["tensorflow", "transformers"]
                 }),
                 mimetype="application/json",
-                status_code=500
+                status_code=500,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
             )
         
         # Connect to Azure Storage
@@ -550,7 +560,12 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse(
                 json.dumps({"error": f"Could not load image/mask: {str(e)}"}),
                 mimetype="application/json",
-                status_code=404
+                status_code=404,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
             )
         
         # Generate individual visualizations for three panels
@@ -586,7 +601,12 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
                         "details": "SegFormer could not be loaded from Azure model storage"
                     }),
                     mimetype="application/json",
-                    status_code=500
+                    status_code=500,
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type"
+                    }
                 )
 
         logging.info("🔮 Generating AI prediction...")
@@ -598,7 +618,12 @@ def colorized_masks(req: func.HttpRequest) -> func.HttpResponse:
                     "details": "SegFormer inference returned no mask"
                 }),
                 mimetype="application/json",
-                status_code=500
+                status_code=500,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                }
             )
 
         # Create prediction visualization
