@@ -20,6 +20,10 @@ from pathlib import Path
 # Use non-interactive backend
 matplotlib.use('Agg')
 
+# Python 3.12 removed stdlib distutils; this ensures setuptools' shim is available
+# before TensorFlow/Transformers import checks run in the Functions worker.
+import setuptools  # noqa: F401
+
 # Try to import TensorFlow and Transformers (for model loading)
 try:
     import tensorflow as tf
