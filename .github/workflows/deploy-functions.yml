@@ -10,7 +10,6 @@ env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './backend'
   PYTHON_VERSION: '3.12'
   PUBLISH_PROFILE_PRIMARY: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_OCP8_CENTRALUS_V2 }}
-  PUBLISH_PROFILE_FALLBACK: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
   AZURE_CREDENTIALS_JSON: ${{ secrets.AZURE_CREDENTIALS }}
 
 jobs:
@@ -37,12 +36,10 @@ jobs:
       shell: bash
       run: |
         if [ -z "${{ env.PUBLISH_PROFILE_PRIMARY }}" ] && \
-           [ -z "${{ env.PUBLISH_PROFILE_FALLBACK }}" ] && \
            [ -z "${{ env.AZURE_CREDENTIALS_JSON }}" ]; then
           echo "No Azure deployment credentials configured."
           echo "Set one of:"
           echo " - AZUREAPPSERVICE_PUBLISHPROFILE_OCP8_CENTRALUS_V2 (preferred)"
-          echo " - AZURE_FUNCTIONAPP_PUBLISH_PROFILE"
           echo " - AZURE_CREDENTIALS (for azure/login RBAC)"
           exit 1
         fi
@@ -70,4 +67,4 @@ jobs:
         app-name: 'ocp8-centralus-v2'
         slot-name: 'Production'
         package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-        publish-profile: ${{ env.PUBLISH_PROFILE_PRIMARY || env.PUBLISH_PROFILE_FALLBACK }}
+        publish-profile: ${{ env.PUBLISH_PROFILE_PRIMARY }}

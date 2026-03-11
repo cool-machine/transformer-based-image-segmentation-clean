@@ -193,3 +193,6 @@ Thumbs.db
 # Azure Functions
 local.settings.json
 *.settings.json
+
+# Deliverables zip files
+deliverables/
