@@ -38,16 +38,16 @@ except ImportError as e:
 
 app = func.FunctionApp()
 
-# SUPER BRIGHT & DISTINCT COLORS - Every class gets maximum visibility!
+# High-contrast, colorblind-friendly palette for clear class separation
 BEAUTIFUL_COLOR_MAP = {
-    0: (255, 0, 255),      # flat/road - BRIGHT MAGENTA/FUCHSIA  
-    1: (255, 0, 0),        # human/person - BRIGHT RED
-    2: (0, 255, 255),      # vehicle - BRIGHT CYAN
-    3: (0, 255, 0),        # construction/building - BRIGHT LIME GREEN
-    4: (255, 255, 0),      # object/pole/sign - BRIGHT YELLOW
-    5: (0, 128, 255),      # nature/vegetation - BRIGHT BLUE
-    6: (255, 192, 203),    # sky - LIGHT PINK/ROSE
-    7: (255, 165, 0)       # void/other - BRIGHT ORANGE
+    0: (31, 119, 180),     # flat/road - BLUE
+    1: (214, 39, 40),      # human/person - RED
+    2: (255, 127, 14),     # vehicle - ORANGE
+    3: (44, 160, 44),      # construction/building - GREEN
+    4: (148, 103, 189),    # object/pole/sign - PURPLE
+    5: (140, 86, 75),      # nature/vegetation - BROWN
+    6: (227, 119, 194),    # sky - PINK
+    7: (23, 190, 207)      # void/other - CYAN
 }
 
 # Cityscapes 30-class to 8-class conversion mapping
