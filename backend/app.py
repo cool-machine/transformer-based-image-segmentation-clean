@@ -52,7 +52,7 @@ BEAUTIFUL_COLOR_MAP = {
     3: (44, 160, 44),      # construction/building - VERT
     4: (31, 119, 180),     # object/pole/sign - BLEU
     5: (140, 86, 75),      # nature/vegetation - BRUN
-    6: (227, 119, 194),    # sky - ROSE
+    6: (255, 224, 130),    # sky - JAUNE DOUX
     7: (23, 190, 207),     # void/other - CYAN
 }
 

@@ -46,7 +46,7 @@ BEAUTIFUL_COLOR_MAP = {
     3: (44, 160, 44),      # construction/building - GREEN
     4: (31, 119, 180),     # object/pole/sign - BLUE
     5: (140, 86, 75),      # nature/vegetation - BROWN
-    6: (227, 119, 194),    # sky - PINK
+    6: (255, 224, 130),    # sky - SOFT YELLOW
     7: (23, 190, 207)      # void/other - CYAN
 }
 
