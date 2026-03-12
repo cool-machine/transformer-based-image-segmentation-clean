@@ -40,11 +40,11 @@ app = func.FunctionApp()
 
 # High-contrast, colorblind-friendly palette for clear class separation
 BEAUTIFUL_COLOR_MAP = {
-    0: (255, 127, 14),     # flat/road - ORANGE (was vehicle)
+    0: (31, 119, 180),     # flat/road - BLUE
     1: (214, 39, 40),      # human/person - RED
-    2: (148, 103, 189),    # vehicle - VIOLET
+    2: (255, 127, 14),     # vehicle - ORANGE
     3: (44, 160, 44),      # construction/building - GREEN
-    4: (31, 119, 180),     # object/pole/sign - BLUE
+    4: (148, 103, 189),    # object/pole/sign - PURPLE
     5: (140, 86, 75),      # nature/vegetation - BROWN
     6: (227, 119, 194),    # sky - PINK
     7: (23, 190, 207)      # void/other - CYAN
