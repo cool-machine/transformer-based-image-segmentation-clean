@@ -46,11 +46,11 @@ logger = logging.getLogger(__name__)
 
 # Palette de couleurs identique a la production (function_app.py)
 BEAUTIFUL_COLOR_MAP = {
-    0: (31, 119, 180),     # flat/road - BLEU
+    0: (255, 127, 14),     # flat/road - ORANGE (was vehicle)
     1: (214, 39, 40),      # human/person - ROUGE
-    2: (255, 127, 14),     # vehicle - ORANGE
+    2: (148, 103, 189),    # vehicle - VIOLET
     3: (44, 160, 44),      # construction/building - VERT
-    4: (148, 103, 189),    # object/pole/sign - VIOLET
+    4: (31, 119, 180),     # object/pole/sign - BLEU
     5: (140, 86, 75),      # nature/vegetation - BRUN
     6: (227, 119, 194),    # sky - ROSE
     7: (23, 190, 207),     # void/other - CYAN
