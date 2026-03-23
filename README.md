@@ -11,6 +11,12 @@ Production-focused semantic segmentation app with:
 - **Backend**: Azure Functions HTTP API
 - **Storage**: Azure Blob container `images1`
 
+## Live URLs
+
+- **Frontend**: `https://cool-machine.github.io/transformer-based-image-segmentation-clean/`
+- **Backend API**: `https://ocp8-centralus-v2.azurewebsites.net/api`
+- **Backend health**: `https://ocp8-centralus-v2.azurewebsites.net/api/health`
+
 ## API Contract Used by Frontend
 
 The frontend calls only these endpoints:
@@ -80,6 +86,8 @@ Set local settings from template:
 
 - **GitHub Pages**: `.github/workflows/simple-deploy.yml`
 - **Azure Functions**: `.github/workflows/deploy-functions.yml`
+- **Published frontend**: `https://cool-machine.github.io/transformer-based-image-segmentation-clean/`
+- **Published backend**: `https://ocp8-centralus-v2.azurewebsites.net/api`
 
 ## Notes
 
