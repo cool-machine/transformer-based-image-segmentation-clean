@@ -60,7 +60,7 @@ jobs:
               --code ImageUri="$IMAGE_URI" \
               --role "${{ vars.AWS_LAMBDA_ROLE_ARN }}" \
               --architectures x86_64 \
-              --memory-size 4096 \
+              --memory-size 3008 \
               --timeout 300 \
               --ephemeral-storage Size=1024 \
               --environment 'Variables={OCP8_BUCKET=clarifiance-ocp8-artifacts-174208891400}' >/dev/null
