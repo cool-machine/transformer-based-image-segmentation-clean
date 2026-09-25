@@ -151,6 +151,9 @@ Resources:
                   StringEquals:
                     iam:PassedToService: lambda.amazonaws.com
               - Effect: Allow
+                Action: iam:GetRole
+                Resource: arn:aws:iam::174208891400:role/ocp8-lambda-execution
+              - Effect: Allow
                 Action:
                   - cloudformation:DescribeStackEvents
                   - cloudformation:DescribeStacks
