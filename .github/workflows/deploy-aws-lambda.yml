@@ -46,47 +46,14 @@ jobs:
           docker push "$IMAGE_URI"
           echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
 
-      - name: Create or update Lambda
+      - name: Deploy image through the OCP8 CloudFormation stack
         run: |
-          if aws lambda get-function --function-name "$LAMBDA_FUNCTION" >/dev/null 2>&1; then
-            aws lambda update-function-code \
-              --function-name "$LAMBDA_FUNCTION" \
-              --image-uri "$IMAGE_URI" >/dev/null
-            aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"
-          else
-            aws lambda create-function \
-              --function-name "$LAMBDA_FUNCTION" \
-              --package-type Image \
-              --code ImageUri="$IMAGE_URI" \
-              --role "${{ vars.AWS_LAMBDA_ROLE_ARN }}" \
-              --architectures x86_64 \
-              --memory-size 3008 \
-              --timeout 300 \
-              --ephemeral-storage Size=1024 \
-              --environment 'Variables={OCP8_BUCKET=clarifiance-ocp8-artifacts-174208891400}' >/dev/null
-            aws lambda wait function-active --function-name "$LAMBDA_FUNCTION"
-          fi
-
-      - name: Ensure public Function URL
-        run: |
-          if ! aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION" >/dev/null 2>&1; then
-            aws lambda create-function-url-config \
-              --function-name "$LAMBDA_FUNCTION" \
-              --auth-type NONE \
-              --cors 'AllowOrigins=https://cool-machine.github.io,AllowMethods=GET,AllowHeaders=content-type,MaxAge=86400' >/dev/null
-          fi
-          aws lambda add-permission \
-            --function-name "$LAMBDA_FUNCTION" \
-            --statement-id FunctionURLAllowPublicAccess \
-            --action lambda:InvokeFunctionUrl \
-            --principal '*' \
-            --function-url-auth-type NONE >/dev/null 2>&1 || true
-          aws lambda add-permission \
-            --function-name "$LAMBDA_FUNCTION" \
-            --statement-id FunctionURLInvokePublic \
-            --action lambda:InvokeFunction \
-            --principal '*' \
-            --invoked-via-function-url >/dev/null 2>&1 || true
+          aws cloudformation update-stack \
+            --stack-name ocp8 \
+            --use-previous-template \
+            --parameters ParameterKey=ImageUri,ParameterValue="$IMAGE_URI" \
+            --capabilities CAPABILITY_NAMED_IAM >/dev/null
+          aws cloudformation wait stack-update-complete --stack-name ocp8
           aws lambda get-function-url-config \
             --function-name "$LAMBDA_FUNCTION" \
             --query FunctionUrl \

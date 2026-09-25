@@ -10,6 +10,7 @@ Production-focused semantic segmentation recruiting demo with:
 - **Frontend**: static page on GitHub Pages
 - **Backend**: AWS Lambda Function URL, scaling to zero
 - **Storage**: private S3 bucket `clarifiance-ocp8-artifacts-174208891400`
+- **Project wrapper**: CloudFormation stack `ocp8` in `us-east-1`
 
 ## Live URLs
 
@@ -46,6 +47,7 @@ The frontend calls only these endpoints:
 ├── aws_lambda/
 │   ├── Dockerfile
 │   ├── handler.py
+│   ├── ocp8-stack.yaml
 │   └── requirements.txt
 ├── notebooks/
 ├── .github/workflows/
@@ -91,9 +93,12 @@ Set local settings from template:
 
 - **GitHub Pages**: `.github/workflows/simple-deploy.yml`
 - **AWS Lambda**: `.github/workflows/deploy-aws-lambda.yml`
+- **AWS infrastructure**: `aws_lambda/ocp8-stack.yaml`; the `ocp8` CloudFormation stack owns all dedicated runtime resources.
 - **Legacy Azure rollback**: `.github/workflows/deploy-functions.yml`
 - **Published frontend**: `https://cool-machine.github.io/transformer-based-image-segmentation-clean/`
 - **AWS deployment authentication**: GitHub OIDC with short-lived credentials; no AWS access keys are stored in GitHub.
+
+Deleting the `ocp8` stack is intentionally destructive: it empties and deletes the versioned artifact bucket, deletes the ECR images/repository, Lambda, Function URL, log groups and OCP8-specific IAM roles. The account-level GitHub OIDC provider is shared and therefore remains outside this stack.
 
 ## Notes
 

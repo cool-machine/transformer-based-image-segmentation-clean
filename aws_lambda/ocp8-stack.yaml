@@ -1,0 +1,341 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: OCP8 image-segmentation demo runtime and dedicated deployment resources.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Default: 174208891400.dkr.ecr.us-east-1.amazonaws.com/ocp8-segmentation@sha256:b0b5bfa8d5e6b60bad10eef81a28b696ee7c36474a93cddbabf9bbcc1bb9f98f
+    Description: Immutable ECR image URI deployed to the OCP8 Lambda function.
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: clarifiance-ocp8-artifacts-174208891400
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  ContainerRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: ocp8-segmentation
+      EmptyOnDelete: true
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LambdaECRImageRetrievalPolicy
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Condition:
+              StringLike:
+                aws:SourceArn: arn:aws:lambda:us-east-1:174208891400:function:ocp8-segmentation
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RoleName: ocp8-lambda-execution
+      Path: /
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ocp8-runtime-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: arn:aws:logs:us-east-1:174208891400:*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:us-east-1:174208891400:log-group:/aws/lambda/ocp8-segmentation:*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: arn:aws:s3:::clarifiance-ocp8-artifacts-174208891400
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - models/*
+                      - images1/*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - arn:aws:s3:::clarifiance-ocp8-artifacts-174208891400/models/*
+                  - arn:aws:s3:::clarifiance-ocp8-artifacts-174208891400/images1/*
+
+  GitHubDeploymentRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RoleName: github-ocp8-deploy
+      Path: /
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: arn:aws:iam::174208891400:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:cool-machine/transformer-based-image-segmentation-clean:ref:refs/heads/main
+      Policies:
+        - PolicyName: ocp8-github-deployment
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: arn:aws:ecr:us-east-1:174208891400:repository/ocp8-segmentation
+              - Effect: Allow
+                Action:
+                  - lambda:AddPermission
+                  - lambda:CreateFunction
+                  - lambda:CreateFunctionUrlConfig
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:GetFunctionUrlConfig
+                  - lambda:UpdateFunctionCode
+                Resource: arn:aws:lambda:us-east-1:174208891400:function:ocp8-segmentation
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: arn:aws:iam::174208891400:role/ocp8-lambda-execution
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                Resource: arn:aws:cloudformation:us-east-1:174208891400:stack/ocp8/*
+
+  SegmentationFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      FunctionName: ocp8-segmentation
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ImageUri
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Architectures:
+        - x86_64
+      MemorySize: 3008
+      Timeout: 300
+      EphemeralStorage:
+        Size: 1024
+      Environment:
+        Variables:
+          OCP8_BUCKET: clarifiance-ocp8-artifacts-174208891400
+      TracingConfig:
+        Mode: PassThrough
+
+  SegmentationFunctionUrl:
+    Type: AWS::Lambda::Url
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      # A literal ARN avoids a false conditional-replacement signal when only
+      # the function's DeletionPolicy changes during lifecycle updates.
+      TargetFunctionArn: arn:aws:lambda:us-east-1:174208891400:function:ocp8-segmentation
+      AuthType: NONE
+      InvokeMode: BUFFERED
+      Cors:
+        AllowOrigins:
+          - https://cool-machine.github.io
+        AllowMethods:
+          - GET
+        AllowHeaders:
+          - content-type
+        MaxAge: 86400
+
+  FunctionUrlPublicAccess:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      FunctionName: !Ref SegmentationFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  FunctionUrlInvokePublic:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      FunctionName: !Ref SegmentationFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/lambda/ocp8-segmentation
+      LogGroupClass: STANDARD
+
+  BucketCleanupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ocp8-bucket-cleanup
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ocp8-bucket-cleanup
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ocp8-bucket-cleanup:*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                Resource: !GetAtt ArtifactBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource: !Sub ${ArtifactBucket.Arn}/*
+
+  BucketCleanupFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: BucketCleanupLogGroup
+    Properties:
+      FunctionName: ocp8-bucket-cleanup
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt BucketCleanupRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          import urllib.request
+
+          import boto3
+
+
+          def respond(event, context, status, reason=None):
+              body = json.dumps({
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch log stream {context.log_stream_name}",
+                  "PhysicalResourceId": event.get("PhysicalResourceId", "ocp8-artifact-bucket-cleanup"),
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "NoEcho": False,
+                  "Data": {},
+              }).encode("utf-8")
+              request = urllib.request.Request(
+                  event["ResponseURL"],
+                  data=body,
+                  method="PUT",
+                  headers={"content-type": "", "content-length": str(len(body))},
+              )
+              with urllib.request.urlopen(request) as response:
+                  response.read()
+
+
+          def empty_bucket(bucket_name):
+              s3 = boto3.client("s3")
+              paginator = s3.get_paginator("list_object_versions")
+              for page in paginator.paginate(Bucket=bucket_name):
+                  objects = [
+                      {"Key": item["Key"], "VersionId": item["VersionId"]}
+                      for item in page.get("Versions", []) + page.get("DeleteMarkers", [])
+                  ]
+                  for start in range(0, len(objects), 1000):
+                      s3.delete_objects(
+                          Bucket=bucket_name,
+                          Delete={"Objects": objects[start:start + 1000], "Quiet": True},
+                      )
+
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      empty_bucket(event["ResourceProperties"]["BucketName"])
+                  respond(event, context, "SUCCESS")
+              except Exception as error:
+                  respond(event, context, "FAILED", str(error))
+
+  BucketCleanupLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/ocp8-bucket-cleanup
+      RetentionInDays: 7
+
+  EmptyArtifactBucketOnDelete:
+    Type: Custom::EmptyVersionedS3Bucket
+    Properties:
+      ServiceToken: !GetAtt BucketCleanupFunction.Arn
+      BucketName: !Ref ArtifactBucket
+
+Outputs:
+  FunctionUrl:
+    Value: !GetAtt SegmentationFunctionUrl.FunctionUrl
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+  ContainerRepositoryUri:
+    Value: !GetAtt ContainerRepository.RepositoryUri
