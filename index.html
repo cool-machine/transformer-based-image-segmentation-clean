@@ -271,7 +271,7 @@
             <!-- Image Gallery -->
             <div class="selection-section">
                 <div class="section-title">🖼️ Click on Available Images</div>
-                <p>Click on any image placeholder below to generate colorized masks. Images are stored in Azure Storage.</p>
+                <p>Click an image below to compare the original, ground truth, and model prediction. Demo artifacts are stored securely in Amazon S3.</p>
                 
                 <div id="imageGallery" class="image-gallery">
                     <div class="no-images">
@@ -282,7 +282,7 @@
             
             <!-- Loading indicator -->
             <div id="loading" class="loading">
-                <p>🔄 Processing image... This may take a moment.</p>
+                <p>🔄 Loading the model and generating the demo. A cold start can take up to a minute.</p>
             </div>
             
             <!-- Results section -->
@@ -297,7 +297,7 @@
 
     <script>
 // Configuration
-const API_BASE_URL = 'https://ocp8-centralus-v2.azurewebsites.net/api'; // New Central US Azure Functions endpoint
+const API_BASE_URL = 'https://ocp8-centralus-v2.azurewebsites.net/api'; // Replaced with the verified Lambda Function URL at cutover.
 
 // DOM elements
 const imageDropdown = document.getElementById('imageDropdown');
@@ -364,7 +364,7 @@ function renderImageGallery() {
     if (availableImages.length === 0) {
         imageGallery.innerHTML = `
             <div class="no-images">
-                <p>Images are stored in Azure Storage. Use the dropdown menu above to select an image.</p>
+                <p>Demo images are stored in Amazon S3. Use the dropdown menu above to select an image.</p>
             </div>
         `;
         return;
@@ -382,7 +382,7 @@ function renderImageGallery() {
                 </div>
                 <div class="image-info">
                     <div class="image-name">${imageName}</div>
-                    <div class="image-city">📁 Azure Storage</div>
+                    <div class="image-city">📁 Amazon S3</div>
                 </div>
             </div>
         `;
@@ -448,7 +448,7 @@ async function segmentImage(imageName, city = null) {
             cleanImageName = imageName.replace('.png', '').replace('.jpg', '');
         }
 
-        // Use Azure Functions-only inference path.
+        // Use the deployed serverless inference path.
         const groundTruthResponse = await fetchWithRetry(
             `${API_BASE_URL}/colorized-masks?image_name=${encodeURIComponent(cleanImageName)}`,
             {},
@@ -553,7 +553,7 @@ function displayColorizedResults(result) {
         });
     }
 
-    // AI Model Prediction from Azure Functions inference
+    // AI model prediction from the serverless inference backend.
     if (result.visualizations?.predicted) {
         resultItems.push({
             title: '🤖 AI Model Prediction',
@@ -590,7 +590,7 @@ function showLoading(show) {
     const submitButtons = document.querySelectorAll('.submit-btn');
     submitButtons.forEach(btn => {
         btn.disabled = show;
-        btn.textContent = show ? '🔄 Processing...' : '🎨 Generate Colorized Masks';
+        btn.textContent = show ? '🔄 Loading model and processing...' : '🎨 Generate Colorized Masks';
     });
 }
 

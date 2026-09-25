@@ -1,0 +1,93 @@
+name: Deploy AWS Lambda API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "aws_lambda/**"
+      - ".github/workflows/deploy-aws-lambda.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ocp8-aws-lambda
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ocp8-segmentation
+  LAMBDA_FUNCTION: ocp8-segmentation
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sign in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Lambda image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --platform linux/amd64 --provenance=false -t "$IMAGE_URI" aws_lambda
+          docker push "$IMAGE_URI"
+          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
+
+      - name: Create or update Lambda
+        run: |
+          if aws lambda get-function --function-name "$LAMBDA_FUNCTION" >/dev/null 2>&1; then
+            aws lambda update-function-code \
+              --function-name "$LAMBDA_FUNCTION" \
+              --image-uri "$IMAGE_URI" >/dev/null
+            aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"
+          else
+            aws lambda create-function \
+              --function-name "$LAMBDA_FUNCTION" \
+              --package-type Image \
+              --code ImageUri="$IMAGE_URI" \
+              --role "${{ vars.AWS_LAMBDA_ROLE_ARN }}" \
+              --architectures x86_64 \
+              --memory-size 4096 \
+              --timeout 300 \
+              --ephemeral-storage Size=1024 \
+              --environment 'Variables={OCP8_BUCKET=clarifiance-ocp8-artifacts-174208891400}' >/dev/null
+            aws lambda wait function-active --function-name "$LAMBDA_FUNCTION"
+          fi
+
+      - name: Ensure public Function URL
+        run: |
+          if ! aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION" >/dev/null 2>&1; then
+            aws lambda create-function-url-config \
+              --function-name "$LAMBDA_FUNCTION" \
+              --auth-type NONE \
+              --cors 'AllowOrigins=https://cool-machine.github.io,AllowMethods=GET,AllowHeaders=content-type,MaxAge=86400' >/dev/null
+          fi
+          aws lambda add-permission \
+            --function-name "$LAMBDA_FUNCTION" \
+            --statement-id FunctionURLAllowPublicAccess \
+            --action lambda:InvokeFunctionUrl \
+            --principal '*' \
+            --function-url-auth-type NONE >/dev/null 2>&1 || true
+          aws lambda add-permission \
+            --function-name "$LAMBDA_FUNCTION" \
+            --statement-id FunctionURLInvokePublic \
+            --action lambda:InvokeFunction \
+            --principal '*' \
+            --invoked-via-function-url >/dev/null 2>&1 || true
+          aws lambda get-function-url-config \
+            --function-name "$LAMBDA_FUNCTION" \
+            --query FunctionUrl \
+            --output text
