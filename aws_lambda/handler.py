@@ -30,12 +30,6 @@ DISPLAY_SIZE = (1024, 512)
 S3 = boto3.client("s3")
 _MODEL = None
 
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-}
-
 COLOR_MAP = {
     0: (31, 119, 180),
     1: (214, 39, 40),
@@ -63,7 +57,7 @@ def _response(status_code: int, payload: dict[str, Any] | str) -> dict[str, Any]
     body = payload if isinstance(payload, str) else json.dumps(payload)
     return {
         "statusCode": status_code,
-        "headers": {"Content-Type": "application/json", **CORS_HEADERS},
+        "headers": {"Content-Type": "application/json"},
         "body": body,
         "isBase64Encoded": False,
     }

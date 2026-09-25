@@ -14,7 +14,7 @@ Production-focused semantic segmentation recruiting demo with:
 ## Live URLs
 
 - **Frontend**: `https://cool-machine.github.io/transformer-based-image-segmentation-clean/`
-- **Backend API**: set after the AWS deployment is verified
+- **Backend API**: `https://pp6wy37fjaf4bgwgqmpzzz4lfu0rdowk.lambda-url.us-east-1.on.aws/`
 - **Legacy rollback API**: `https://ocp8-centralus-v2.azurewebsites.net/api`
 
 ## API Contract Used by Frontend
@@ -28,6 +28,7 @@ The frontend calls only these endpoints:
 ## Important Runtime Behavior
 
 - Model inference is **required** for `colorized-masks` and loads lazily after scale-to-zero.
+- The first inference after scale-to-zero can take about three minutes; warm inference is about eleven seconds in the verified deployment.
 - If model dependencies (`tensorflow`, `transformers`) are missing, the API returns a **500 error**.
 - If model load/prediction fails, the API returns a **500 error**.
 - No silent fallback success path is kept.

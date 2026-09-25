@@ -162,6 +162,28 @@ if ! aws ecr describe-repositories \
     --encryption-configuration encryptionType=AES256 >/dev/null
 fi
 
+ecr_lambda_policy="$(mktemp)"
+cat >"$ecr_lambda_policy" <<JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "LambdaECRImageRetrievalPolicy",
+    "Effect": "Allow",
+    "Principal": {"Service": "lambda.amazonaws.com"},
+    "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+    "Condition": {
+      "StringLike": {
+        "aws:SourceArn": "arn:aws:lambda:${region}:${account_id}:function:${function_name}"
+      }
+    }
+  }]
+}
+JSON
+aws ecr set-repository-policy \
+  --repository-name "$repository" \
+  --region "$region" \
+  --policy-text "file://$ecr_lambda_policy" >/dev/null
+
 printf 'AWS_DEPLOY_ROLE_ARN=arn:aws:iam::%s:role/%s\n' "$account_id" "$deploy_role"
 printf 'AWS_LAMBDA_ROLE_ARN=arn:aws:iam::%s:role/%s\n' "$account_id" "$lambda_role"
 printf 'ECR_REPOSITORY=%s\n' "$repository"
